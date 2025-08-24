@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "React Component Editor",
+  title: "here-we-go",
   description: "Professional React component editor with visual editing capabilities",
 };
 

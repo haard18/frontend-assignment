@@ -1,3 +1,5 @@
+
+### VERY AI GENERATED README
 # React Component Editor
 
 A powerful visual editor for React components that allows you to edit components by clicking on elements and modifying their properties in real-time. Built with Next.js, TypeScript, and Tailwind CSS.

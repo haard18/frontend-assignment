@@ -41,7 +41,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
           <div className="space-y-4">
             <p className="text-gray-600">
-              Welcome to the React Component Editor! You've been assigned a unique user ID to keep track of your components.
+              Welcome to here-we-go! You've been assigned a unique user ID to keep track of your components.
             </p>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
