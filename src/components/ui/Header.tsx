@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Save, Library, Clock, FileText, Eye } from 'lucide-react';
+import { UserInfo } from './UserInfo';
 
 interface HeaderProps {
   title?: string;
@@ -79,6 +80,7 @@ export function Header({
                   {hasUnsavedChanges ? 'Unsaved changes' : `Last saved ${formatRelativeTime(lastSaved)}`}
                 </p>
               )}
+              <UserInfo className="hidden sm:flex" />
             </div>
           </div>
         </div>

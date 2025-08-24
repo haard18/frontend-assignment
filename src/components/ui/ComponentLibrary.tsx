@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Eye, Edit3, Calendar, Clock } from 'lucide-react';
+import { X, Plus, Trash2, Eye, Edit3, Calendar, Clock, User } from 'lucide-react';
 import { ComponentData } from '@/types';
 import { useComponentAPI } from '@/hooks/useComponentAPI';
+import { getCurrentUserId, isMyComponent } from '@/lib/userUtils';
 
 interface ComponentLibraryProps {
   isOpen: boolean;
@@ -15,7 +16,7 @@ interface ComponentLibraryProps {
 export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateNew }: ComponentLibraryProps) {
   const [components, setComponents] = useState<ComponentData[]>([]);
   const [loading, setLoading] = useState(false);
-  const { loadComponent, updateComponent } = useComponentAPI();
+  const { loadComponent, updateComponent, loadMyComponents } = useComponentAPI();
 
   useEffect(() => {
     if (isOpen) {
@@ -26,15 +27,8 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
   const loadComponents = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/component');
-      if (response.ok) {
-        const data = await response.json();
-        // Handle the response structure from the API
-        setComponents(Array.isArray(data) ? data : data.components || []);
-      } else {
-        console.error('Failed to load components');
-        setComponents([]);
-      }
+      const myComponents = await loadMyComponents();
+      setComponents(myComponents);
     } catch (error) {
       console.error('Failed to load components:', error);
       setComponents([]);
@@ -94,8 +88,11 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
           {/* Header */}
           <div className="flex items-center justify-between p-3 sm:p-6 border-b border-gray-200">
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Component Library</h2>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">Manage your saved components</p>
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">My Components</h2>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">Your personal component library</p>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               <button
@@ -167,6 +164,7 @@ interface ComponentCardProps {
 function ComponentCard({ component, onSelect, onDelete, onUpdate }: ComponentCardProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(component.name || 'Untitled Component');
+  const isOwner = isMyComponent(component.userId);
 
   const handleNameSave = async () => {
     if (editedName.trim() && editedName !== component.name) {
@@ -187,25 +185,32 @@ function ComponentCard({ component, onSelect, onDelete, onUpdate }: ComponentCar
   return (
     <div className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow bg-white">
       <div className="flex items-start justify-between mb-2 sm:mb-3">
-        {isEditingName ? (
-          <input
-            type="text"
-            value={editedName}
-            onChange={(e) => setEditedName(e.target.value)}
-            onBlur={handleNameSave}
-            onKeyDown={handleKeyDown}
-            className="font-medium text-gray-900 bg-transparent border-b border-blue-500 focus:outline-none focus:border-blue-600 flex-1 mr-2 text-sm sm:text-base"
-            autoFocus
-          />
-        ) : (
-          <h3 
-            className="font-medium text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors text-sm sm:text-base"
-            onClick={() => setIsEditingName(true)}
-            title="Click to edit name"
-          >
-            {component.name || 'Untitled Component'}
-          </h3>
-        )}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {isEditingName ? (
+            <input
+              type="text"
+              value={editedName}
+              onChange={(e) => setEditedName(e.target.value)}
+              onBlur={handleNameSave}
+              onKeyDown={handleKeyDown}
+              className="font-medium text-gray-900 bg-transparent border-b border-blue-500 focus:outline-none focus:border-blue-600 flex-1 mr-2 text-sm sm:text-base"
+              autoFocus
+            />
+          ) : (
+            <>
+              <h3 
+                className="font-medium text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors text-sm sm:text-base"
+                onClick={() => setIsEditingName(true)}
+                title="Click to edit name"
+              >
+                {component.name || 'Untitled Component'}
+              </h3>
+              {isOwner && (
+                <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0" title="Your component" />
+              )}
+            </>
+          )}
+        </div>
         <div className="flex items-center space-x-1 ml-2 flex-shrink-0">
           <button
             onClick={onSelect}

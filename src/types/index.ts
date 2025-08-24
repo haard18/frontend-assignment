@@ -3,6 +3,7 @@ export interface ComponentData {
   name: string;
   code: string;
   serializedComponent: SerializedElement;
+  userId?: string;
   createdAt?: string;
   updatedAt?: string;
 }

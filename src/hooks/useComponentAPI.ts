@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react';
 import { ComponentData } from '@/types';
+import { getCurrentUserId } from '@/lib/userUtils';
 
 interface UseComponentAPIReturn {
   saveComponent: (component: ComponentData) => Promise<ComponentData | null>;
   loadComponent: (id: string) => Promise<ComponentData | null>;
+  loadMyComponents: () => Promise<ComponentData[]>;
   updateComponent: (id: string, updates: Partial<ComponentData>) => Promise<ComponentData | null>;
   deleteComponent: (id: string) => Promise<void>;
   loading: boolean;
@@ -19,12 +21,18 @@ export function useComponentAPI(): UseComponentAPIReturn {
     setError(null);
     
     try {
+      // Automatically add userId to the component
+      const componentWithUser = {
+        ...component,
+        userId: getCurrentUserId(),
+      };
+
       const response = await fetch('/api/component', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(component),
+        body: JSON.stringify(componentWithUser),
       });
 
       if (!response.ok) {
@@ -36,6 +44,28 @@ export function useComponentAPI(): UseComponentAPIReturn {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadMyComponents = useCallback(async (): Promise<ComponentData[]> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const userId = getCurrentUserId();
+      const response = await fetch(`/api/component?userId=${encodeURIComponent(userId)}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to load components');
+      }
+
+      const data = await response.json();
+      return data.components || [];
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -112,6 +142,7 @@ export function useComponentAPI(): UseComponentAPIReturn {
   return {
     saveComponent,
     loadComponent,
+    loadMyComponents,
     updateComponent,
     deleteComponent,
     loading,

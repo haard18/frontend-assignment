@@ -2,9 +2,17 @@
 
 import React, { Suspense } from 'react';
 import { WebsiteEditor } from './WebsiteEditor';
+import { WelcomeModal, useWelcomeModal } from './ui/WelcomeModal';
 
 function WebsiteEditorWithSearchParams() {
-  return <WebsiteEditor />;
+  const { isWelcomeOpen, closeWelcome } = useWelcomeModal();
+
+  return (
+    <>
+      <WebsiteEditor />
+      <WelcomeModal isOpen={isWelcomeOpen} onClose={closeWelcome} />
+    </>
+  );
 }
 
 export function WebsiteEditorWrapper() {

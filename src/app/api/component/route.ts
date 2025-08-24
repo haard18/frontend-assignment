@@ -28,10 +28,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    
     const components = getAllComponents();
-    return NextResponse.json({ components });
+    
+    // Filter components by userId if provided
+    const filteredComponents = userId 
+      ? components.filter(component => component.userId === userId)
+      : components;
+    
+    return NextResponse.json({ components: filteredComponents });
   } catch (error) {
     console.error('Error getting components:', error);
     return NextResponse.json(
