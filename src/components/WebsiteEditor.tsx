@@ -19,7 +19,7 @@ interface WebsiteEditorProps {
   initialData?: ComponentData;
 }
 
-export function WebsiteEditor({ component, onSave, initialData }: WebsiteEditorProps) {
+export const WebsiteEditor = React.memo(function WebsiteEditor({ component, onSave, initialData }: WebsiteEditorProps) {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const isNew = searchParams.get('new') === 'true';
@@ -40,16 +40,18 @@ export function WebsiteEditor({ component, onSave, initialData }: WebsiteEditorP
   const { showToast } = useToast();
   const { loadComponent, saveComponent, updateComponent } = useComponentAPI();
 
-  // Load component if editing existing one
-  useEffect(() => {
-    if (editId) {
-      loadExistingComponent(editId);
-    } else if (isNew) {
-      resetToDefault();
-    }
-  }, [editId, isNew]);
+  const resetToDefault = useCallback(() => {
+    setComponentData(null);
+    setCode('');
+    setHasUnsavedChanges(false);
+    setEditorState({
+      selectedElement: null,
+      isEditing: false,
+      hoveredElement: null,
+    });
+  }, []);
 
-  const loadExistingComponent = async (id: string) => {
+  const loadExistingComponent = useCallback(async (id: string) => {
     try {
       setIsLoading(true);
       const component = await loadComponent(id);
@@ -69,22 +71,20 @@ export function WebsiteEditor({ component, onSave, initialData }: WebsiteEditorP
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadComponent, showToast, resetToDefault]);
 
-  const resetToDefault = () => {
-    setComponentData(null);
-    setCode('');
-    setHasUnsavedChanges(false);
-    setEditorState({
-      selectedElement: null,
-      isEditing: false,
-      hoveredElement: null,
-    });
-  };
+  // Load component if editing existing one
+  useEffect(() => {
+    if (editId) {
+      loadExistingComponent(editId);
+    } else if (isNew) {
+      resetToDefault();
+    }
+  }, [editId, isNew, loadExistingComponent, resetToDefault]);
 
   // Parse initial component code
   useEffect(() => {
-    if (!componentData && !initialData) {
+    if (!componentData && !initialData && !editId && !isNew) {
       // Create a professional welcome component
       const defaultCode = `<div className="max-w-2xl mx-auto p-8 bg-white rounded-xl shadow-sm border border-gray-200">
   <div className="text-center">
@@ -103,7 +103,7 @@ export function WebsiteEditor({ component, onSave, initialData }: WebsiteEditorP
       setCode(defaultCode);
       handleParseComponent(defaultCode);
     }
-  }, [componentData, initialData]);
+  }, [initialData, editId, isNew]);
 
   const handleTitleChange = useCallback((newTitle: string) => {
     if (componentData) {
@@ -504,4 +504,4 @@ export function WebsiteEditor({ component, onSave, initialData }: WebsiteEditorP
       )}
     </div>
   );
-}
+});

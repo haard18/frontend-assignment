@@ -15,7 +15,7 @@ export default function ComponentsPage() {
 
   useEffect(() => {
     fetchComponents();
-  });
+  }, []);
 
   const fetchComponents = async () => {
     try {
