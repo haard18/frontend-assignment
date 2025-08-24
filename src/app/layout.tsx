@@ -30,10 +30,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
       >
         <ToastProvider>
-          <Navbar />
-          <main className="min-h-screen">
-            {children}
-          </main>
+          <div className="flex flex-col min-h-screen">
+            <Navbar />
+            <main className="flex-1 overflow-hidden">
+              {children}
+            </main>
+          </div>
         </ToastProvider>
       </body>
     </html>

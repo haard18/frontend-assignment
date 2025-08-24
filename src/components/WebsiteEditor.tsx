@@ -12,6 +12,7 @@ import { Header } from './ui/Header';
 import { ComponentLibrary } from './ui/ComponentLibrary';
 import { useToast } from './ui/Toast';
 import { useComponentAPI } from '@/hooks/useComponentAPI';
+import { X } from 'lucide-react';
 
 interface WebsiteEditorProps {
   component?: React.ReactNode;
@@ -423,7 +424,7 @@ export const WebsiteEditor = React.memo(function WebsiteEditor({ component, onSa
       />
 
       {parseError && (
-        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+        <div className="mx-3 sm:mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
           <p className="text-red-600 text-sm">
             <strong>Parse Error:</strong> {parseError}
           </p>
@@ -433,17 +434,23 @@ export const WebsiteEditor = React.memo(function WebsiteEditor({ component, onSa
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0">
           <Tabs 
             value={activeTab} 
             onValueChange={(value) => setActiveTab(value as 'visual' | 'code')}
             className="h-full flex flex-col"
           >
-            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-              <TabsList>
-                <TabsTrigger value="visual">Visual Editor</TabsTrigger>
-                <TabsTrigger value="code">Code Editor</TabsTrigger>
+            <div className="bg-gray-50 border-b border-gray-200 px-3 sm:px-6 py-3">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="visual" className="text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Visual Editor</span>
+                  <span className="sm:hidden">Visual</span>
+                </TabsTrigger>
+                <TabsTrigger value="code" className="text-xs sm:text-sm">
+                  <span className="hidden sm:inline">Code Editor</span>
+                  <span className="sm:hidden">Code</span>
+                </TabsTrigger>
               </TabsList>
             </div>
             
@@ -456,15 +463,15 @@ export const WebsiteEditor = React.memo(function WebsiteEditor({ component, onSa
                   onElementHover={handleElementHover}
                 />
               ) : (
-                <div className="h-full flex items-center justify-center">
+                <div className="h-full flex items-center justify-center p-4">
                   <div className="text-center max-w-md">
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No Component Loaded</h3>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-gray-600 mb-4 text-sm">
                       Paste your JSX code in the code editor or start with a template.
                     </p>
                     <button
                       onClick={() => setActiveTab('code')}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                     >
                       Open Code Editor
                     </button>
@@ -483,11 +490,38 @@ export const WebsiteEditor = React.memo(function WebsiteEditor({ component, onSa
           </Tabs>
         </div>
 
+        {/* Property Panel - Mobile: Sheet overlay, Desktop: Sidebar */}
         {editorState.selectedElement && (
-          <PropertyPanel
-            selectedElement={editorState.selectedElement}
-            onPropertyChange={handlePropertyChange}
-          />
+          <>
+            {/* Mobile Property Panel - Full screen overlay */}
+            <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50" onClick={() => setEditorState(prev => ({ ...prev, selectedElement: null }))}>
+              <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                  <h3 className="font-semibold text-gray-900">Properties</h3>
+                  <button
+                    onClick={() => setEditorState(prev => ({ ...prev, selectedElement: null }))}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="overflow-auto">
+                  <PropertyPanel
+                    selectedElement={editorState.selectedElement}
+                    onPropertyChange={handlePropertyChange}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Property Panel - Sidebar */}
+            <div className="hidden lg:block w-80 border-l border-gray-200">
+              <PropertyPanel
+                selectedElement={editorState.selectedElement}
+                onPropertyChange={handlePropertyChange}
+              />
+            </div>
+          </>
         )}
       </div>
 

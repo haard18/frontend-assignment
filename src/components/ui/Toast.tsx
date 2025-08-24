@@ -69,7 +69,7 @@ function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed top-2 sm:top-4 left-2 right-2 sm:left-auto sm:right-4 z-50 space-y-2 sm:max-w-sm">
       {toasts.map(toast => (
         <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
       ))}
@@ -107,20 +107,20 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
   const Icon = iconMap[toast.type];
 
   return (
-    <div className={`max-w-sm w-full border rounded-lg shadow-lg p-4 ${colorMap[toast.type]} animate-in slide-in-from-right duration-300`}>
+    <div className={`w-full border rounded-lg shadow-lg p-3 sm:p-4 ${colorMap[toast.type]} animate-in slide-in-from-right duration-300`}>
       <div className="flex items-start">
-        <Icon className={`w-5 h-5 mt-0.5 mr-3 ${iconColorMap[toast.type]}`} />
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 mt-0.5 mr-2 sm:mr-3 flex-shrink-0 ${iconColorMap[toast.type]}`} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{toast.title}</p>
+          <p className="text-xs sm:text-sm font-medium">{toast.title}</p>
           {toast.message && (
-            <p className="text-sm mt-1 opacity-90">{toast.message}</p>
+            <p className="text-xs sm:text-sm mt-1 opacity-90">{toast.message}</p>
           )}
         </div>
         <button
           onClick={() => onRemove(toast.id)}
-          className="ml-3 inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
+          className="ml-2 sm:ml-3 inline-flex text-gray-400 hover:text-gray-600 focus:outline-none flex-shrink-0"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3 h-3 sm:w-4 sm:h-4" />
         </button>
       </div>
     </div>
