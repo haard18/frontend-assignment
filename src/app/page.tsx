@@ -1,11 +1,11 @@
 'use client';
 
-import { WebsiteEditor } from '@/components/WebsiteEditor';
+import { WebsiteEditorWrapper } from '@/components/WebsiteEditorWrapper';
 
 export default function Home() {
   return (
     <div className="h-[calc(100vh-4rem)]">
-      <WebsiteEditor />
+      <WebsiteEditorWrapper />
     </div>
   );
 }
