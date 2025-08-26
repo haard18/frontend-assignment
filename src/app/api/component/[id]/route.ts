@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getComponent, saveComponent, deleteComponent } from '@/lib/storage';
+import { getComponent, updateComponent, deleteComponent } from '@/lib/storage';
 import { ComponentData } from '@/types';
 
 export async function GET(
@@ -34,20 +34,15 @@ export async function PUT(
   try {
     const { id } = await params;
     const updates: Partial<ComponentData> = await request.json();
-    const existingComponent = getComponent(id);
     
-    if (!existingComponent) {
+    const updatedComponent = updateComponent(id, updates);
+    
+    if (!updatedComponent) {
       return NextResponse.json(
         { error: 'Component not found' },
         { status: 404 }
       );
     }
-
-    const updatedComponent = saveComponent({
-      ...existingComponent,
-      ...updates,
-      id,
-    });
 
     return NextResponse.json(updatedComponent);
   } catch (error) {

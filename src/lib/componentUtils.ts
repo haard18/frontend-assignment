@@ -13,36 +13,116 @@ export function parseReactComponent(code: string): SerializedElement | null {
     // First, try to parse the code as-is
     let codeToParse = code.trim();
     
-    // If the code doesn't start with < or doesn't look like JSX, return null
-    if (!codeToParse.startsWith('<')) {
-      return null;
-    }
+    // Check if this is a function component
+    const isFunctionComponent = codeToParse.includes('export const') || 
+                               codeToParse.includes('const') ||
+                               codeToParse.includes('function ') ||
+                               codeToParse.includes('export function');
     
     let ast;
-    try {
+    
+    if (isFunctionComponent) {
+      // Parse as a module with function component
       ast = parser.parse(codeToParse, {
         sourceType: 'module',
         plugins: ['jsx', 'typescript'],
       });
-    } catch (firstError) {
-      // If parsing fails, try wrapping in a React Fragment
+    } else if (codeToParse.startsWith('<')) {
+      // Parse as JSX directly
       try {
-        const wrappedCode = `<>${codeToParse}</>`;
-        ast = parser.parse(wrappedCode, {
+        ast = parser.parse(codeToParse, {
           sourceType: 'module',
           plugins: ['jsx', 'typescript'],
         });
-      } catch (secondError) {
-        console.error('Error parsing component:', firstError);
-        return null;
+      } catch (firstError) {
+        // If parsing fails, try wrapping in a React Fragment
+        try {
+          const wrappedCode = `<>${codeToParse}</>`;
+          ast = parser.parse(wrappedCode, {
+            sourceType: 'module',
+            plugins: ['jsx', 'typescript'],
+          });
+        } catch (secondError) {
+          console.error('Error parsing component:', firstError);
+          return null;
+        }
       }
+    } else {
+      // If the code doesn't start with < and isn't a function component, return null
+      return null;
     }
 
     let componentElement: SerializedElement | null = null;
 
     traverse(ast, {
+      // Handle function components
+      ArrowFunctionExpression(path) {
+        if (componentElement) return; // Only take the first component
+        
+        // Check if this arrow function returns JSX
+        if (t.isBlockStatement(path.node.body)) {
+          // Look for return statement with JSX
+          const returnStatement = path.node.body.body.find(stmt => t.isReturnStatement(stmt));
+          if (returnStatement && t.isReturnStatement(returnStatement) && returnStatement.argument) {
+            if (t.isJSXElement(returnStatement.argument)) {
+              componentElement = serializeJSXElement(returnStatement.argument);
+            } else if (t.isJSXFragment(returnStatement.argument)) {
+              componentElement = {
+                type: 'Fragment',
+                props: {},
+                children: returnStatement.argument.children.map(child => 
+                  t.isJSXElement(child) ? serializeJSXElement(child) :
+                  t.isJSXText(child) ? child.value.trim() :
+                  t.isJSXExpressionContainer(child) ? 'expression' : ''
+                ).filter(Boolean),
+                id: generateId()
+              };
+            }
+          }
+        } else if (t.isJSXElement(path.node.body)) {
+          // Direct JSX return
+          componentElement = serializeJSXElement(path.node.body);
+        } else if (t.isJSXFragment(path.node.body)) {
+          // Direct JSX Fragment return
+          componentElement = {
+            type: 'Fragment',
+            props: {},
+            children: path.node.body.children.map(child => 
+              t.isJSXElement(child) ? serializeJSXElement(child) :
+              t.isJSXText(child) ? child.value.trim() :
+              t.isJSXExpressionContainer(child) ? 'expression' : ''
+            ).filter(Boolean),
+            id: generateId()
+          };
+        }
+      },
+      
+      // Handle function declarations
+      FunctionDeclaration(path) {
+        if (componentElement) return; // Only take the first component
+        
+        // Look for return statement with JSX
+        const returnStatement = path.node.body.body.find(stmt => t.isReturnStatement(stmt));
+        if (returnStatement && t.isReturnStatement(returnStatement) && returnStatement.argument) {
+          if (t.isJSXElement(returnStatement.argument)) {
+            componentElement = serializeJSXElement(returnStatement.argument);
+          } else if (t.isJSXFragment(returnStatement.argument)) {
+            componentElement = {
+              type: 'Fragment',
+              props: {},
+              children: returnStatement.argument.children.map(child => 
+                t.isJSXElement(child) ? serializeJSXElement(child) :
+                t.isJSXText(child) ? child.value.trim() :
+                t.isJSXExpressionContainer(child) ? 'expression' : ''
+              ).filter(Boolean),
+              id: generateId()
+            };
+          }
+        }
+      },
+      
       JSXElement(path) {
-        // Only take the first/root JSX element
+        // Only take the first/root JSX element if no function component found
         if (!componentElement) {
           componentElement = serializeJSXElement(path.node);
         }
@@ -93,7 +173,28 @@ function serializeJSXElement(element: t.JSXElement): SerializedElement {
             value = attr.value.expression.value;
           } else if (t.isBooleanLiteral(attr.value.expression)) {
             value = attr.value.expression.value;
+          } else if (t.isObjectExpression(attr.value.expression)) {
+            // Handle style objects and other object expressions
+            const obj: Record<string, unknown> = {};
+            attr.value.expression.properties.forEach(prop => {
+              if (t.isObjectProperty(prop) && 
+                  (t.isStringLiteral(prop.key) || t.isIdentifier(prop.key))) {
+                const propKey = t.isStringLiteral(prop.key) ? prop.key.value : prop.key.name;
+                
+                if (t.isStringLiteral(prop.value)) {
+                  obj[propKey] = prop.value.value;
+                } else if (t.isNumericLiteral(prop.value)) {
+                  obj[propKey] = prop.value.value;
+                } else if (t.isBooleanLiteral(prop.value)) {
+                  obj[propKey] = prop.value.value;
+                } else {
+                  obj[propKey] = generate(prop.value).code;
+                }
+              }
+            });
+            value = obj;
           } else {
+            // For other expressions, generate the code
             value = generate(attr.value.expression).code;
           }
         }
@@ -109,12 +210,18 @@ function serializeJSXElement(element: t.JSXElement): SerializedElement {
     if (t.isJSXElement(child)) {
       return serializeJSXElement(child);
     } else if (t.isJSXText(child)) {
-      return child.value.trim();
+      const trimmedText = child.value.trim();
+      return trimmedText || '';
     } else if (t.isJSXExpressionContainer(child)) {
       if (t.isStringLiteral(child.expression)) {
         return child.expression.value;
+      } else if (t.isNumericLiteral(child.expression)) {
+        return child.expression.value.toString();
+      } else if (t.isBooleanLiteral(child.expression)) {
+        return child.expression.value.toString();
       }
-      return 'expression';
+      // For other expressions, try to generate readable code
+      return generate(child.expression).code;
     }
     return '';
   }).filter(child => child !== '');
@@ -155,8 +262,17 @@ export function serializeToCode(element: SerializedElement): string {
           return `${key}="${value}"`;
         } else if (typeof value === 'boolean') {
           return value ? key : '';
+        } else if (typeof value === 'number') {
+          return `${key}={${value}}`;
+        } else if (typeof value === 'object' && value !== null) {
+          // Handle object props like style
+          const objString = JSON.stringify(value, null, 0)
+            .replace(/"/g, "'")  // Use single quotes for object keys/values
+            .replace(/'/g, '"'); // But keep double quotes for JSON
+          return `${key}={${objString}}`;
         } else {
-          return `${key}={${JSON.stringify(value)}}`;
+          // Handle expressions or other complex values
+          return `${key}={${String(value)}}`;
         }
       })
       .filter(Boolean)
@@ -166,6 +282,13 @@ export function serializeToCode(element: SerializedElement): string {
     
     if (children.length === 0) {
       return `${indent}<${type}${propsString ? ` ${propsString}` : ''} />`;
+    }
+
+    // Check if all children are simple text (no nested elements)
+    const isSimpleText = children.length === 1 && typeof children[0] === 'string';
+    
+    if (isSimpleText) {
+      return `${indent}${openTag}${children[0]}</${type}>`;
     }
 
     const childrenString = children

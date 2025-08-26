@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Eye, Edit3, Calendar, Clock, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Trash2, Eye, Edit3, Calendar, Clock, User, Download, Upload, Database } from 'lucide-react';
 import { ComponentData } from '@/types';
 import { useComponentAPI } from '@/hooks/useComponentAPI';
 import { getCurrentUserId, isMyComponent } from '@/lib/userUtils';
@@ -13,14 +13,24 @@ interface ComponentLibraryProps {
   onCreateNew: () => void;
 }
 
+interface StorageInfo {
+  count: number;
+  lastSync: string | null;
+  storageSize: number;
+}
+
 export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateNew }: ComponentLibraryProps) {
   const [components, setComponents] = useState<ComponentData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
+  const [showStorageInfo, setShowStorageInfo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { loadComponent, updateComponent, loadMyComponents } = useComponentAPI();
 
   useEffect(() => {
     if (isOpen) {
       loadComponents();
+      loadStorageInfo();
     }
   }, [isOpen]);
 
@@ -37,6 +47,96 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
     }
   };
 
+  const loadStorageInfo = async () => {
+    try {
+      const response = await fetch('/api/component?info=true');
+      if (response.ok) {
+        const info = await response.json();
+        setStorageInfo(info);
+      }
+    } catch (error) {
+      console.error('Failed to load storage info:', error);
+    }
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(components, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `components-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const jsonData = e.target?.result as string;
+        const importedComponents = JSON.parse(jsonData);
+        
+        if (!Array.isArray(importedComponents)) {
+          alert('Invalid file format. Please select a valid components export file.');
+          return;
+        }
+
+        let importCount = 0;
+        for (const component of importedComponents) {
+          if (component.serializedComponent && component.code) {
+            try {
+              const response = await fetch('/api/component', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  ...component,
+                  id: undefined, // Let the API generate new IDs
+                  userId: getCurrentUserId(),
+                  importedAt: new Date().toISOString(),
+                }),
+              });
+              
+              if (response.ok) {
+                importCount++;
+              }
+            } catch (error) {
+              console.error('Failed to import component:', component.name, error);
+            }
+          }
+        }
+        
+        alert(`Successfully imported ${importCount} component(s).`);
+        loadComponents(); // Refresh the list
+        loadStorageInfo(); // Refresh storage info
+      } catch (error) {
+        console.error('Import error:', error);
+        alert('Failed to import components. Please check the file format.');
+      }
+    };
+    
+    reader.readAsText(file);
+    // Reset the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this component?')) return;
     
@@ -47,6 +147,7 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
       
       if (response.ok) {
         setComponents(prev => prev.filter(c => c.id !== id));
+        loadStorageInfo(); // Refresh storage info
       }
     } catch (error) {
       console.error('Failed to delete component:', error);
@@ -66,6 +167,7 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
       if (response.ok) {
         const updatedComponent = await response.json();
         setComponents(prev => prev.map(c => c.id === id ? updatedComponent : c));
+        loadStorageInfo(); // Refresh storage info
       }
     } catch (error) {
       console.error('Failed to update component:', error);
@@ -91,10 +193,55 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-900">My Components</h2>
+                {storageInfo && (
+                  <button
+                    onClick={() => setShowStorageInfo(!showStorageInfo)}
+                    className="inline-flex items-center px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-600 transition-colors"
+                  >
+                    <Database className="w-3 h-3 mr-1" />
+                    {storageInfo.count}
+                  </button>
+                )}
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">Your personal component library</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">Your personal component library with persistent storage</p>
+              
+              {/* Storage Info */}
+              {showStorageInfo && storageInfo && (
+                <div className="mt-2 p-2 bg-blue-50 rounded-md">
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>Components: {storageInfo.count}</div>
+                    <div>Storage size: {formatBytes(storageInfo.storageSize)}</div>
+                    {storageInfo.lastSync && (
+                      <div>Last sync: {formatDate(storageInfo.lastSync)}</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              {/* Import/Export buttons */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 sm:p-2 text-gray-400 hover:text-green-600 focus:outline-none"
+                title="Import components"
+              >
+                <Upload className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleExport}
+                className="p-1.5 sm:p-2 text-gray-400 hover:text-blue-600 focus:outline-none"
+                title="Export components"
+                disabled={components.length === 0}
+              >
+                <Download className="w-4 h-4" />
+              </button>
               <button
                 onClick={handleCreateNew}
                 className="inline-flex items-center px-2 sm:px-4 py-1.5 sm:py-2 border border-transparent text-xs sm:text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -125,14 +272,23 @@ export function ComponentLibrary({ isOpen, onClose, onSelectComponent, onCreateN
                   <Edit3 className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
                 </div>
                 <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No components yet</h3>
-                <p className="text-sm text-gray-500 mb-6">Create your first component to get started</p>
-                <button
-                  onClick={handleCreateNew}
-                  className="inline-flex items-center px-3 sm:px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Component
-                </button>
+                <p className="text-sm text-gray-500 mb-6">Create your first component or import existing ones</p>
+                <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                  <button
+                    onClick={handleCreateNew}
+                    className="inline-flex items-center px-3 sm:px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Component
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center px-3 sm:px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import Components
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
